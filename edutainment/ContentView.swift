@@ -235,17 +235,13 @@ struct GameView: View {
             
                 VStack {
                     Text("Answered Questions").font(.headline)
-                    List {
-                        ForEach(storedQuestions, id: \.self) { question in
-                            HStack {
-                                // System symbol checkmark or Cross
-                                Image(systemName: "\(question.result == .correct ? "checkmark.seal.fill" : "xmark.seal.fill")")
-                                
-                                // Question + answer:
-                                // question = answer (correct answer if wrong)
-                                Text(self.textForStoredQuestion(question))
-                            }
-                        }
+                    List(storedQuestions) { question in
+                        // System symbol checkmark or Cross
+                        Image(systemName: "\(question.result == .correct ? "checkmark.seal.fill" : "xmark.seal.fill")")
+                        
+                        // Question + answer:
+                        // question = answer (correct answer if wrong)
+                        Text(self.textForStoredQuestion(question))
                     }
                 }
             }

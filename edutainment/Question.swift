@@ -19,18 +19,10 @@ struct Question {
     let answer: Int
 }
 
-struct StoredQuestion: Identifiable, Hashable {
+struct StoredQuestion: Identifiable {
     
     let id = UUID()
     let question: Question
     let givenAnswer: Int
     let result: QuestionResult
-    
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-    
-    static func == (lhs: StoredQuestion, rhs: StoredQuestion) -> Bool {
-        lhs.id == rhs.id
-    }
 }
