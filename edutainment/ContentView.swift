@@ -228,9 +228,9 @@ struct GameView: View {
                                     // Offer to play again or change settings
                                 }
                             }
-                            .opacity(questionAnswered ? 1.0 : 0.0)
                         }
                     }
+                    .opacity(questionAnswered ? 1.0 : 0.0)
                 }
             
                 VStack {
