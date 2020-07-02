@@ -73,9 +73,23 @@ struct ContentView: View {
         
         NavigationView {
             
-            SettingsView(numberOfQuestions: $numberOfQuestions,
-                         maximumMultiplication: $maximumMultiplication)
-                .navigationBarTitle(headerForState)
+            ZStack {
+                Group {
+                    SettingsView(
+                        numberOfQuestions: $numberOfQuestions,
+                        maximumMultiplication: $maximumMultiplication,
+                        state: $state
+                    )
+                }.zIndex(state == .settings ? 1 : 0)
+                
+                Group {
+                    GameView(
+                        maximumMultiplication: $maximumMultiplication,
+                        numberOfQuestions: $numberOfQuestions
+                    )
+                }.zIndex(state == .game ? 1 : 0)
+            }
+            .navigationBarTitle(headerForState)
         }
     }
 }
@@ -90,10 +104,11 @@ struct SettingsView: View {
     
     @Binding var numberOfQuestions: NumberOfQuestions
     @Binding var maximumMultiplication: Int
+    @Binding var state: AppState
     
     var body: some View {
+        
         Form {
-            
             Section(
                 header: Text("Multiply up to:").font(.headline)
             ) {
@@ -127,45 +142,141 @@ struct SettingsView: View {
             // Start game button
             HStack {
                 Button("Start Game") {
-                    // Start game
+                    self.state = .game
                 }
             }
         }
     }
 }
 
-/*
 struct GameView: View {
     
-    @State private var allQuestions = [Question]()
+    @State private var allQuestions = [Question(text: "1 x 1", answer: 1), Question(text: "2 x 2", answer: 4)]
     @State private var storedQuestions = [StoredQuestion]()
-    @State private var currentQuestion: Int? = nil
+    @State private var currentQuestion: Int = 0
+    @State private var answer: String = ""
+    @State private var questionAnswered = false
+    
+    @Binding var maximumMultiplication: Int
+    @Binding var numberOfQuestions: NumberOfQuestions
+    
+    var numericalAnswer: Int {
+        Int(answer) ?? 0
+    }
     
     var body: some View {
         
-        VStack {
-            
+        List {
             // Question label
-            Text().font(.largeTitle)
-        
-            // Answer text field with decimal pad
-            TextField()
+            Section(header: Text("Question \(currentQuestion + 1) of \(allQuestions.count)").font(.headline)) {
             
-            // Correct / Wrong label
-            Text().font(.headline)
+                Text("What is \(allQuestions[currentQuestion].text)?")
+            }
             
-            // List with answered questions
-            List {
-                // For each of answered questions
+            Section(header: Text("Answer").font(.headline)) {
+                HStack {
+                    TextField("Type your answer here", text: $answer)
+                        .keyboardType(.decimalPad)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
                 
-                // System symbol checkmark or Cross
-                Image()
+                    Button("Submit") {
+                        self.hideKeyboard()
+                        self.questionAnswered = true
+                    }
+                    .opacity(answer == "" ? 0.0 : 1.0)
+                }
+            }
+            
+            Section(header: Text("Result").font(.headline)) {
                 
-                // Question + answer:
-                // question = answer (correct answer if wrong)
-                Text()
+                VStack {
+                    // Correct / Wrong label
+                    Text("").font(.headline)
+                 
+                    Button("Next question") {
+                        
+                        self.storeAnswer(self.numericalAnswer)
+                        self.answer = ""
+                        self.questionAnswered = false
+                        
+                        if self.currentQuestion < self.allQuestions.count - 1 {
+                            self.currentQuestion += 1
+                        } else {
+                            // TODO: Game over
+                            // Collect # of correct answers
+                            // Show alert controller with # of correct answers
+                            // Offer to play again or change settings
+                        }
+                    }
+                    .opacity(questionAnswered ? 1.0 : 0.0)
+                }
+            }
+            
+            Section(header: Text("Answered Questions").font(.headline)) {
+                
+                // List with answered questions
+                List {
+                    ForEach(storedQuestions, id: \.self) { question in
+                        HStack {
+                            // System symbol checkmark or Cross
+                            Image(systemName: "\(question.result == .correct ? "checkmark.seal.fill" : "xmark.seal.fill")")
+                            
+                            // Question + answer:
+                            // question = answer (correct answer if wrong)
+                            Text(self.textForStoredQuestion(question))
+                        }
+                    }
+                }
+                //.id(UUID())
             }
         }
     }
+    
+    func createMultiplicationTable() -> [Question] {
+        // TODO: Implement me
+        return []
+    }
+    
+    func storeAnswer(_ answer: Int) {
+        
+        let question = allQuestions[currentQuestion]
+        let result: QuestionResult = question.answer == answer
+            ? .correct
+            : .wrong
+        
+        let storedQuestion = StoredQuestion(
+            question: question,
+            givenAnswer: answer,
+            result: result
+        )
+        storedQuestions.insert(storedQuestion, at: 0)
+        print("Number of stored questions: \(storedQuestions.count)")
+    }
+    
+    func numberOfCorrectAnswers() -> Int {
+        
+        storedQuestions.reduce(0) {
+            $0 + ($1.result == .correct ? 1 : 0)
+        }
+    }
+    
+    func textForStoredQuestion(_ question: StoredQuestion) -> String {
+        
+        "\(question.question.text) = \(question.givenAnswer)"
+            + "\(question.result == .wrong ? " (\(question.question.answer))" : "")"
+    }
 }
-*/
+
+#if canImport(UIKit)
+extension View {
+    
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+}
+#endif

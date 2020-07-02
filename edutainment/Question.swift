@@ -8,20 +8,29 @@
 
 import Foundation
 
+enum QuestionResult {
+    case correct
+    case wrong
+}
+
 struct Question {
     
     let text: String
     let answer: Int
 }
 
-struct StoredQuestion {
+struct StoredQuestion: Identifiable, Hashable {
     
-    enum QuestionResult {
-        case correct
-        case wrong
-    }
-    
+    let id = UUID()
     let question: Question
     let givenAnswer: Int
     let result: QuestionResult
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: StoredQuestion, rhs: StoredQuestion) -> Bool {
+        lhs.id == rhs.id
+    }
 }
