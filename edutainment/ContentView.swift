@@ -59,8 +59,6 @@ struct ContentView: View {
     @State private var maximumMultiplication: Int = 1
     @State private var numberOfQuestions: NumberOfQuestions = .five
     
-    //@State private var locations = ["Beach", "Forest", "Desert"]
-    
     var headerForState: String {
         
         switch state {
@@ -80,37 +78,28 @@ struct ContentView: View {
                     SettingsView(
                         numberOfQuestions: $numberOfQuestions,
                         maximumMultiplication: $maximumMultiplication,
-                        state: $state
+                        appState: $state
                     )
-                }.zIndex(state == .settings ? 1 : 0)
+                }
+                .zIndex(state == .settings ? 1 : 0)
+                .opacity(state == .settings ? 1.0 : 0.0)
                 
                 Group {
                     GameView(
                         maximumMultiplication: $maximumMultiplication,
-                        numberOfQuestions: $numberOfQuestions
+                        numberOfQuestions: $numberOfQuestions,
+                        appState: $state
                     )
-                }.zIndex(state == .game ? 1 : 0)
-            }
-            .navigationBarTitle(headerForState)
-            /*
-            List {
-                ForEach(locations, id: \.self) { location in
-                    Text(location)
                 }
+                .zIndex(state == .game ? 1 : 0)
+                .opacity(state == .game ? 1.0 : 0.0)
             }
             .navigationBarTitle(headerForState)
-            .navigationBarItems(trailing: Button(action: {
-                self.addRow()
-            }) { Image(systemName: "plus")})
-            */
+            .navigationBarItems(trailing: Button("\(state == .settings ? "Start" : "Cancel") game") {
+                self.state.toggle()
+            })
         }
     }
-    
-    /*
-    private func addRow() {
-        self.locations.insert("New Location", at: 0)
-    }
-    */
 }
 
 struct ContentView_Previews: PreviewProvider {
@@ -123,7 +112,8 @@ struct SettingsView: View {
     
     @Binding var numberOfQuestions: NumberOfQuestions
     @Binding var maximumMultiplication: Int
-    @Binding var state: AppState
+    
+    @Binding var appState: AppState
     
     var body: some View {
         
@@ -157,13 +147,6 @@ struct SettingsView: View {
                 .labelsHidden()
                 .pickerStyle(SegmentedPickerStyle())
             }
-            
-            // Start game button
-            HStack {
-                Button("Start Game") {
-                    self.state = .game
-                }
-            }
         }
     }
 }
@@ -176,81 +159,122 @@ struct GameView: View {
     @State private var answer: String = ""
     @State private var questionAnswered = false
     
+    @State private var showAlert = false
+    
     @Binding var maximumMultiplication: Int
     @Binding var numberOfQuestions: NumberOfQuestions
+    @Binding var appState: AppState {
+        didSet {
+            cleanUp()
+        }
+    }
     
     var numericalAnswer: Int {
-        Int(answer) ?? 0
+        Int(answer) ?? -1
     }
     
     var body: some View {
-        NavigationView {
-            VStack {
-                List {
-                    // Question label
-                    Section(header: Text("Question \(currentQuestion + 1) of \(allQuestions.count)").font(.headline)) {
-                    
-                        Text("What is \(allQuestions[currentQuestion].text)?")
-                    }
-                    
-                    Section(header: Text("Answer").font(.headline)) {
-                        HStack {
-                            TextField("Type your answer here", text: $answer)
-                                .keyboardType(.decimalPad)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                        
-                            Button("Submit") {
-                                self.hideKeyboard()
-                                self.questionAnswered = true
-                            }
-                            .opacity(answer == "" ? 0.0 : 1.0)
-                        }
-                    }
-                    
-                    Section(header: Text("Result").font(.headline)) {
-                        
-                        VStack {
-                            // Correct / Wrong label
-                            Text("").font(.headline)
-                         
-                            Button("Next question") {
-                                
-                                self.storeAnswer(self.numericalAnswer)
-                                self.answer = ""
-                                self.questionAnswered = false
-                                
-                                if self.currentQuestion < self.allQuestions.count - 1 {
-                                    self.currentQuestion += 1
-                                } else {
-                                    // TODO: Game over
-                                    // Collect # of correct answers
-                                    // Show alert controller with # of correct answers
-                                    // Offer to play again or change settings
-                                }
-                            }
-                        }
-                    }
-                    .opacity(questionAnswered ? 1.0 : 0.0)
-                }
+        
+        VStack {
             
-                VStack {
-                    Text("Answered Questions").font(.headline)
-                    List(storedQuestions) { question in
-                        // System symbol checkmark or Cross
-                        Image(systemName: "\(question.result == .correct ? "checkmark.seal.fill" : "xmark.seal.fill")")
-                        
-                        // Question + answer:
-                        // question = answer (correct answer if wrong)
-                        Text(self.textForStoredQuestion(question))
+            HStack {
+                Text("Question \(currentQuestion + 1) of \(allQuestions.count): ").font(.headline)
+                
+                Text("What is \(allQuestions[currentQuestion].text)?")
+            }
+            .padding()
+        
+            HStack {
+                Text("Answer: ").font(.headline)
+                
+                TextField("Type your answer here", text: $answer)
+                    .keyboardType(.decimalPad)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+            
+                Button("Submit") {
+                    self.hideKeyboard()
+                    self.questionAnswered = true
+                }
+                .opacity(numericalAnswer < 0 ? 0.0 : 1.0)
+            }
+            .padding()
+            
+            VStack {
+                
+                // Correct / Wrong label
+                Text(self.handleAnswer(self.numericalAnswer))
+                    .font(.headline)
+                    .padding()
+                
+                Button("Next question") {
+                    
+                    self.storeAnswer(self.numericalAnswer)
+                    self.answer = ""
+                    self.questionAnswered = false
+                    
+                    if self.currentQuestion < self.allQuestions.count - 1 {
+                        self.currentQuestion += 1
+                    } else {
+                        self.showAlert = true
                     }
+                }
+                .padding(.vertical)
+            }
+            .opacity(questionAnswered ? 1.0 : 0.0)
+        
+            VStack {
+                Text("Answered Questions").font(.headline)
+                List(storedQuestions) { question in
+                    
+                    Image(systemName: "\(question.result == .correct ? "checkmark.seal.fill" : "xmark.seal.fill")")
+                    
+                    Text(self.textForStoredQuestion(question))
                 }
             }
+            .opacity(storedQuestions.isEmpty ? 0.0 : 1.0)
+            .padding()
+        }
+        .alert(isPresented: $showAlert) {
+            
+            // Collect # of correct answers
+            // Display string with # correct answers
+            // Button Restart game
+            // Button Settings
+            Alert(
+                title: Text("Game Over"),
+                message: Text("You scored \(self.numberOfCorrectAnswers()) out of \(self.allQuestions.count) questions"),
+                primaryButton: .default(Text("Restart")) {
+                    self.cleanUp()
+                },
+                secondaryButton: .cancel(Text("Settings")) {
+                    self.appState = .settings
+                })
         }
     }
     
     func createMultiplicationTable() -> [Question] {
         // TODO: Implement me
-        return []
+        return [
+            Question(text: "1 x 1", answer: 1),
+            Question(text: "2 x 2", answer: 4)
+        ]
+    }
+    
+    func handleAnswer(_ answer: Int) -> String {
+        
+        let question = allQuestions[currentQuestion]
+        let result: QuestionResult = question.answer == answer
+            ? .correct
+            : .wrong
+        
+        switch result {
+            
+        case .correct:
+            return "✅ Correct! \(question.text) = \(answer)"
+            
+        case .wrong:
+            return "❌ Wrong! \(question.text) = \(question.answer), your answer: \(answer)"
+        }
     }
     
     func storeAnswer(_ answer: Int) {
@@ -266,7 +290,6 @@ struct GameView: View {
             result: result
         )
         storedQuestions.insert(storedQuestion, at: 0)
-        print("Number of stored questions: \(storedQuestions.count)")
     }
     
     func numberOfCorrectAnswers() -> Int {
@@ -280,6 +303,15 @@ struct GameView: View {
         
         "\(question.question.text) = \(question.givenAnswer)"
             + "\(question.result == .wrong ? " (\(question.question.answer))" : "")"
+    }
+    
+    func cleanUp() {
+        
+        self.storedQuestions = []
+        self.allQuestions = self.createMultiplicationTable()
+        self.answer = ""
+        self.questionAnswered = false
+        self.currentQuestion = 0
     }
 }
 
