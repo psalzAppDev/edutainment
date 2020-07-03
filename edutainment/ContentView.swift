@@ -58,6 +58,7 @@ struct ContentView: View {
     @State private var state: AppState = .settings
     @State private var maximumMultiplication: Int = 1
     @State private var numberOfQuestions: NumberOfQuestions = .five
+    @State private var setOfQuestions = SetOfQuestions()
     
     var headerForState: String {
         
@@ -74,29 +75,39 @@ struct ContentView: View {
         NavigationView {
             
             ZStack {
-                Group {
-                    SettingsView(
-                        numberOfQuestions: $numberOfQuestions,
-                        maximumMultiplication: $maximumMultiplication,
-                        appState: $state
-                    )
-                }
+                SettingsView(
+                    numberOfQuestions: $numberOfQuestions,
+                    maximumMultiplication: $maximumMultiplication,
+                    appState: $state
+                )
                 .zIndex(state == .settings ? 1 : 0)
                 .opacity(state == .settings ? 1.0 : 0.0)
                 
-                Group {
-                    GameView(
-                        maximumMultiplication: $maximumMultiplication,
-                        numberOfQuestions: $numberOfQuestions,
-                        appState: $state
-                    )
-                }
+                GameView(
+                    maximumMultiplication: $maximumMultiplication,
+                    numberOfQuestions: $numberOfQuestions,
+                    appState: $state,
+                    allQuestions: $setOfQuestions
+                )
                 .zIndex(state == .game ? 1 : 0)
                 .opacity(state == .game ? 1.0 : 0.0)
             }
             .navigationBarTitle(headerForState)
             .navigationBarItems(trailing: Button("\(state == .settings ? "Start" : "Cancel") game") {
-                self.state.toggle()
+                
+                switch self.state {
+                    
+                case .game:
+                    self.state = .settings
+                    
+                case .settings:
+                    
+                    self.setOfQuestions.generateQuestions(
+                        upTo: self.maximumMultiplication,
+                        for: self.numberOfQuestions
+                    )
+                    self.state = .game
+                }
             })
         }
     }
@@ -153,7 +164,6 @@ struct SettingsView: View {
 
 struct GameView: View {
     
-    @State private var allQuestions = [Question(text: "1 x 1", answer: 1), Question(text: "2 x 2", answer: 4)]
     @State private var storedQuestions = [StoredQuestion]()
     @State private var currentQuestion: Int = 0
     @State private var answer: String = ""
@@ -163,11 +173,8 @@ struct GameView: View {
     
     @Binding var maximumMultiplication: Int
     @Binding var numberOfQuestions: NumberOfQuestions
-    @Binding var appState: AppState {
-        didSet {
-            cleanUp()
-        }
-    }
+    @Binding var appState: AppState
+    @Binding var allQuestions: SetOfQuestions
     
     var numericalAnswer: Int {
         Int(answer) ?? -1
@@ -178,9 +185,9 @@ struct GameView: View {
         VStack {
             
             HStack {
-                Text("Question \(currentQuestion + 1) of \(allQuestions.count): ").font(.headline)
+                Text("Question \(currentQuestion + 1) of \(allQuestions.questions.count): ").font(.headline)
                 
-                Text("What is \(allQuestions[currentQuestion].text)?")
+                Text("What is \(appState != .game ? "Error" : allQuestions.questions[currentQuestion].text)?")
             }
             .padding()
         
@@ -212,7 +219,7 @@ struct GameView: View {
                     self.answer = ""
                     self.questionAnswered = false
                     
-                    if self.currentQuestion < self.allQuestions.count - 1 {
+                    if self.currentQuestion < self.allQuestions.questions.count - 1 {
                         self.currentQuestion += 1
                     } else {
                         self.showAlert = true
@@ -235,21 +242,21 @@ struct GameView: View {
             .padding()
         }
         .alert(isPresented: $showAlert) {
-            
-            // Collect # of correct answers
-            // Display string with # correct answers
-            // Button Restart game
-            // Button Settings
+
             Alert(
                 title: Text("Game Over"),
-                message: Text("You scored \(self.numberOfCorrectAnswers()) out of \(self.allQuestions.count) questions"),
+                message: Text("You scored \(self.numberOfCorrectAnswers()) out of \(self.allQuestions.questions.count) questions"),
                 primaryButton: .default(Text("Restart")) {
                     self.cleanUp()
+                    self.appState.toggle()
+                    self.appState.toggle()
                 },
                 secondaryButton: .cancel(Text("Settings")) {
+                    self.cleanUp()
                     self.appState = .settings
                 })
         }
+        .navigationBarTitle(Text("Test"))
     }
     
     func createMultiplicationTable() -> [Question] {
@@ -261,8 +268,12 @@ struct GameView: View {
     }
     
     func handleAnswer(_ answer: Int) -> String {
+
+        guard appState == .game else {
+            return "Error"
+        }
         
-        let question = allQuestions[currentQuestion]
+        let question = allQuestions.questions[currentQuestion]
         let result: QuestionResult = question.answer == answer
             ? .correct
             : .wrong
@@ -279,7 +290,7 @@ struct GameView: View {
     
     func storeAnswer(_ answer: Int) {
         
-        let question = allQuestions[currentQuestion]
+        let question = allQuestions.questions[currentQuestion]
         let result: QuestionResult = question.answer == answer
             ? .correct
             : .wrong
@@ -306,9 +317,12 @@ struct GameView: View {
     }
     
     func cleanUp() {
-        
+
         self.storedQuestions = []
-        self.allQuestions = self.createMultiplicationTable()
+        self.allQuestions.generateQuestions(
+            upTo: self.maximumMultiplication,
+            for: self.numberOfQuestions
+        )
         self.answer = ""
         self.questionAnswered = false
         self.currentQuestion = 0

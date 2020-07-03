@@ -26,3 +26,39 @@ struct StoredQuestion: Identifiable {
     let givenAnswer: Int
     let result: QuestionResult
 }
+
+struct SetOfQuestions {
+    
+    var questions = [Question]()
+    
+    mutating func generateQuestions(upTo: Int, for number: NumberOfQuestions) {
+        
+        let range1 = (1...upTo)
+        let range2 = (1...upTo)
+        
+        var allQuestions = [(Int, Int)]()
+        
+        for m1 in range1 {
+            for m2 in range2 {
+                allQuestions.append((m1, m2))
+            }
+        }
+        
+        let subset: [(Int, Int)]
+        
+        switch number {
+            
+        case .all:
+            subset = allQuestions.shuffled()
+            
+        case .five, .ten, .twenty:
+            subset = (0..<number.number).compactMap { _ in
+                allQuestions.randomElement()
+            }
+        }
+            
+        questions = subset.map { (m1, m2) in
+            Question(text: "\(m1) x \(m2)", answer: m1 * m2)
+        }
+    }
+}
