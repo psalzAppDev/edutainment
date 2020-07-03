@@ -72,43 +72,24 @@ struct ContentView: View {
     
     var body: some View {
         
-        NavigationView {
+        ZStack {
+            SettingsView(
+                numberOfQuestions: $numberOfQuestions,
+                maximumMultiplication: $maximumMultiplication,
+                appState: $state,
+                allQuestions: $setOfQuestions
+            )
+            .zIndex(state == .settings ? 1 : 0)
+            .opacity(state == .settings ? 1.0 : 0.0)
             
-            ZStack {
-                SettingsView(
-                    numberOfQuestions: $numberOfQuestions,
-                    maximumMultiplication: $maximumMultiplication,
-                    appState: $state
-                )
-                .zIndex(state == .settings ? 1 : 0)
-                .opacity(state == .settings ? 1.0 : 0.0)
-                
-                GameView(
-                    maximumMultiplication: $maximumMultiplication,
-                    numberOfQuestions: $numberOfQuestions,
-                    appState: $state,
-                    allQuestions: $setOfQuestions
-                )
-                .zIndex(state == .game ? 1 : 0)
-                .opacity(state == .game ? 1.0 : 0.0)
-            }
-            .navigationBarTitle(headerForState)
-            .navigationBarItems(trailing: Button("\(state == .settings ? "Start" : "Cancel") game") {
-                
-                switch self.state {
-                    
-                case .game:
-                    self.state = .settings
-                    
-                case .settings:
-                    
-                    self.setOfQuestions.generateQuestions(
-                        upTo: self.maximumMultiplication,
-                        for: self.numberOfQuestions
-                    )
-                    self.state = .game
-                }
-            })
+            GameView(
+                maximumMultiplication: $maximumMultiplication,
+                numberOfQuestions: $numberOfQuestions,
+                appState: $state,
+                allQuestions: $setOfQuestions
+            )
+            .zIndex(state == .game ? 1 : 0)
+            .opacity(state == .game ? 1.0 : 0.0)
         }
     }
 }
@@ -123,41 +104,51 @@ struct SettingsView: View {
     
     @Binding var numberOfQuestions: NumberOfQuestions
     @Binding var maximumMultiplication: Int
-    
     @Binding var appState: AppState
+    @Binding var allQuestions: SetOfQuestions
     
     var body: some View {
-        
-        Form {
-            Section(
-                header: Text("Multiply up to:").font(.headline)
-            ) {
-                // Stepper for maximum multiplication table
-                Stepper(
-                    value: $maximumMultiplication,
-                    in: 1...12,
-                    step: 1
+        NavigationView {
+            Form {
+                Section(
+                    header: Text("Multiply up to:").font(.headline)
                 ) {
-                    Text("\(maximumMultiplication)")
-                }
-            }
-            
-            Section(
-                header: Text("Number of questions:").font(.headline)
-            ) {
-                // Segmented picker for #questions
-                Picker(
-                    selection: $numberOfQuestions,
-                    label: Text("")
-                ) {
-                    ForEach(NumberOfQuestions.allCases, id: \.self) { number in
-                        
-                        Text(number.string)
+                    // Stepper for maximum multiplication table
+                    Stepper(
+                        value: $maximumMultiplication,
+                        in: 1...12,
+                        step: 1
+                    ) {
+                        Text("\(maximumMultiplication)")
                     }
                 }
-                .labelsHidden()
-                .pickerStyle(SegmentedPickerStyle())
+                
+                Section(
+                    header: Text("Number of questions:").font(.headline)
+                ) {
+                    // Segmented picker for #questions
+                    Picker(
+                        selection: $numberOfQuestions,
+                        label: Text("")
+                    ) {
+                        ForEach(NumberOfQuestions.allCases, id: \.self) { number in
+                            
+                            Text(number.string)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(SegmentedPickerStyle())
+                }
             }
+            .navigationBarTitle(Text("Settings"))
+            .navigationBarItems(trailing: Button("Start game") {
+                
+               self.allQuestions.generateQuestions(
+                   upTo: self.maximumMultiplication,
+                   for: self.numberOfQuestions
+               )
+               self.appState = .game
+            })
         }
     }
 }
@@ -182,89 +173,88 @@ struct GameView: View {
     
     var body: some View {
         
-        VStack {
-            
-            HStack {
-                Text("Question \(currentQuestion + 1) of \(allQuestions.questions.count): ").font(.headline)
-                
-                Text("What is \(appState != .game ? "Error" : allQuestions.questions[currentQuestion].text)?")
-            }
-            .padding()
-        
-            HStack {
-                Text("Answer: ").font(.headline)
-                
-                TextField("Type your answer here", text: $answer)
-                    .keyboardType(.decimalPad)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-            
-                Button("Submit") {
-                    self.hideKeyboard()
-                    self.questionAnswered = true
-                }
-                .opacity(numericalAnswer < 0 ? 0.0 : 1.0)
-            }
-            .padding()
-            
+        NavigationView {
             VStack {
                 
-                // Correct / Wrong label
-                Text(self.handleAnswer(self.numericalAnswer))
-                    .font(.headline)
-                    .padding()
+                HStack {
+                    Text("Question \(currentQuestion + 1) of \(allQuestions.questions.count): ").font(.headline)
+                    
+                    Text("What is \(appState != .game ? "Error" : allQuestions.questions[currentQuestion].text)?")
+                }
+                .padding()
+            
+                HStack {
+                    Text("Answer: ").font(.headline)
+                    
+                    TextField("Type your answer here", text: $answer)
+                        .keyboardType(.decimalPad)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
                 
-                Button("Next question") {
+                    Button("Submit") {
+                        self.hideKeyboard()
+                        self.questionAnswered = true
+                    }
+                    .opacity(numericalAnswer < 0 ? 0.0 : 1.0)
+                }
+                .padding()
+                
+                VStack {
                     
-                    self.storeAnswer(self.numericalAnswer)
-                    self.answer = ""
-                    self.questionAnswered = false
+                    // Correct / Wrong label
+                    Text(self.handleAnswer(self.numericalAnswer))
+                        .font(.headline)
+                        .padding()
                     
-                    if self.currentQuestion < self.allQuestions.questions.count - 1 {
-                        self.currentQuestion += 1
-                    } else {
-                        self.showAlert = true
+                    Button("Next question") {
+                        
+                        self.storeAnswer(self.numericalAnswer)
+                        self.answer = ""
+                        self.questionAnswered = false
+                        
+                        if self.currentQuestion < self.allQuestions.questions.count - 1 {
+                            self.currentQuestion += 1
+                        } else {
+                            self.showAlert = true
+                        }
+                    }
+                    .padding(.vertical)
+                }
+                .opacity(questionAnswered ? 1.0 : 0.0)
+            
+                VStack {
+                    Text("Answered Questions").font(.headline)
+                    List(storedQuestions) { question in
+                        
+                        Image(systemName: "\(question.result == .correct ? "checkmark.seal.fill" : "xmark.seal.fill")")
+                        
+                        Text(self.textForStoredQuestion(question))
                     }
                 }
-                .padding(.vertical)
+                .opacity(storedQuestions.isEmpty ? 0.0 : 1.0)
+                .padding()
             }
-            .opacity(questionAnswered ? 1.0 : 0.0)
-        
-            VStack {
-                Text("Answered Questions").font(.headline)
-                List(storedQuestions) { question in
-                    
-                    Image(systemName: "\(question.result == .correct ? "checkmark.seal.fill" : "xmark.seal.fill")")
-                    
-                    Text(self.textForStoredQuestion(question))
-                }
-            }
-            .opacity(storedQuestions.isEmpty ? 0.0 : 1.0)
-            .padding()
-        }
-        .alert(isPresented: $showAlert) {
+            .alert(isPresented: $showAlert) {
 
-            Alert(
-                title: Text("Game Over"),
-                message: Text("You scored \(self.numberOfCorrectAnswers()) out of \(self.allQuestions.questions.count) questions"),
-                primaryButton: .default(Text("Restart")) {
-                    self.cleanUp()
-                    self.appState.toggle()
-                    self.appState.toggle()
-                },
-                secondaryButton: .cancel(Text("Settings")) {
-                    self.cleanUp()
-                    self.appState = .settings
-                })
+                Alert(
+                    title: Text("Game Over"),
+                    message: Text("You scored \(self.numberOfCorrectAnswers()) out of \(self.allQuestions.questions.count) questions"),
+                    primaryButton: .default(Text("Restart")) {
+                        self.cleanUp()
+                        self.appState.toggle()
+                        self.appState.toggle()
+                    },
+                    secondaryButton: .cancel(Text("Settings")) {
+                        self.cleanUp()
+                        self.appState = .settings
+                    })
+            }
+            .navigationBarTitle(Text("Multitainment"))
+            .navigationBarItems(trailing: Button("Cancel game") {
+                
+               self.cleanUp()
+               self.appState = .settings
+            })
         }
-        .navigationBarTitle(Text("Test"))
-    }
-    
-    func createMultiplicationTable() -> [Question] {
-        // TODO: Implement me
-        return [
-            Question(text: "1 x 1", answer: 1),
-            Question(text: "2 x 2", answer: 4)
-        ]
     }
     
     func handleAnswer(_ answer: Int) -> String {
